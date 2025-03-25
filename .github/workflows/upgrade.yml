@@ -1,4 +1,4 @@
-name: apple-xcframework
+name: upgrade fsplayer
 
 on:
   # push:
@@ -12,7 +12,7 @@ on:
         required: true
 jobs:
   build:
-    name: build-apple-xcframework
+    name: upgrade-fsplayer-version
     runs-on: macos-14
 
     steps:
@@ -23,10 +23,10 @@ jobs:
         GH_TOKEN: ${{ github.token }}
       run: |
         url="https://github.com/debugly/fsplayer/releases/download/$VERSION/FSPlayer.zip"
-        curl -LO "$url" 
+        curl -LO "$url"
         sum=$(swift package compute-checksum FSPlayer.zip)
-        sed -i '' "s/checksum: \".*\"/checksum: \"$sum\"/g" Package.swift
-        sed -i '' "s/url: \".*\"/url: \"$url\"/g" Package.swift
+        sed -i '' "s|checksum: ".*"|checksum: "$sum"|g" Package.swift
+        sed -i '' "s|url: ".*"|url: "$url"|g" Package.swift
         git add Package.swift
         git commit -m "Update version to $VERSION"
         git tag -a $VERSION -m "Release $VERSION"
