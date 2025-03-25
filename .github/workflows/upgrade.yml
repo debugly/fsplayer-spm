@@ -30,5 +30,6 @@ jobs:
         sed -i '' "s|checksum:.*|checksum: \"$sum\"|g" Package.swift
         git add Package.swift
         git commit -m "Update version to $VERSION"
-        git tag -a $VERSION -m "Release $VERSION"
         git push origin main
+        git tag -a $VERSION -m "Release $VERSION"
+        git push origin $VERSION
