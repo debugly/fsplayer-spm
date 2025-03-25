@@ -1,0 +1,33 @@
+name: apple-xcframework
+
+on:
+  # push:
+  #   branches: [master]
+  # pull_request:
+  #   branches: [master]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: fsplayer version
+        required: true
+jobs:
+  build:
+    name: build-apple-xcframework
+    runs-on: macos-14
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Update checksum
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        url="https://github.com/debugly/fsplayer/releases/download/$VERSION/FSPlayer.zip"
+        curl -LO "$url" 
+        sum=$(swift package compute-checksum FSPlayer.zip)
+        sed -i '' "s/checksum: \".*\"/checksum: \"$sum\"/g" Package.swift
+        sed -i '' "s/url: \".*\"/url: \"$url\"/g" Package.swift
+        git add Package.swift
+        git commit -m "Update version to $VERSION"
+        git tag -a $VERSION -m "Release $VERSION"
+        git push origin main
