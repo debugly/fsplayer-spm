@@ -26,8 +26,8 @@ jobs:
         url="https://github.com/debugly/fsplayer/releases/download/$VERSION/FSPlayer.zip"
         curl -LO "$url"
         sum=$(swift package compute-checksum FSPlayer.zip)
-        sed -i '' "s|checksum: ".*"|checksum: "$sum"|g" Package.swift
-        sed -i '' "s|url: ".*"|url: "$url"|g" Package.swift
+        sed -i '' "s|^[[:space:]]*url:.*|            url: \"$url\",|g" Package.swift
+        sed -i '' "s|checksum:.*|checksum: \"$sum\"|g" Package.swift
         git add Package.swift
         git commit -m "Update version to $VERSION"
         git tag -a $VERSION -m "Release $VERSION"

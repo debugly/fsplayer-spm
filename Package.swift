@@ -23,6 +23,7 @@ let package = Package(
         .binaryTarget(
             name: "FSPlayer",
             url: "",
-            checksum: "")
+            checksum: ""
+        )
     ]
 )
