@@ -1,0 +1,33 @@
+name: upgrade fsplayer (with checksum)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: fsplayer version
+        required: true
+      checksum:
+        description: FSPlayer.zip checksum
+        required: true
+jobs:
+  build:
+    name: upgrade-fsplayer-version
+    runs-on: macos-14
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Update checksum
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        VERSION=${{ inputs.version }}
+        CHECKSUM=${{ inputs.checksum }}
+        url="https://github.com/debugly/fsplayer/releases/download/$VERSION/FSPlayer.zip"
+        sed -i '' "s|^[[:space:]]*url:.*|            url: \"$url\",|g" Package.swift
+        sed -i '' "s|checksum:.*|checksum: \"$CHECKSUM\"|g" Package.swift
+        git add Package.swift
+        git commit -m "Update version to $VERSION"
+        git push origin main
+        git tag -a $VERSION -m "Release $VERSION"
+        git push origin $VERSION
