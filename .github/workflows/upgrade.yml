@@ -1,15 +1,16 @@
 name: upgrade fsplayer
 
+# 手动版本：自己下载 zip 并算校验和。自动发布链路走 upgrade-with-checksum.yml。
 on:
-  # push:
-  #   branches: [master]
-  # pull_request:
-  #   branches: [master]
   workflow_dispatch:
     inputs:
       version:
         description: fsplayer version
         required: true
+
+permissions:
+  contents: write
+
 jobs:
   build:
     name: upgrade-fsplayer-version
@@ -17,19 +18,37 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v7
+
     - name: Update checksum
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
-        VERSION=${{ inputs.version }}
+        set -euo pipefail
+        VERSION="${{ inputs.version }}"
         url="https://github.com/debugly/fsplayer/releases/download/$VERSION/FSPlayer.zip"
+
         curl -LO "$url"
         sum=$(swift package compute-checksum FSPlayer.zip)
-        sed -i '' "s|^[[:space:]]*url:.*|            url: \"$url\",|g" Package.swift
-        sed -i '' "s|checksum:.*|checksum: \"$sum\"|g" Package.swift
+
+        sed -i.bak "s|^[[:space:]]*url:.*|            url: \"$url\",|g"  Package.swift
+        sed -i.bak "s|checksum:.*|checksum: \"$sum\"|g"           Package.swift
+        rm -f Package.swift.bak
+
+        if git diff --quiet -- Package.swift; then
+          echo "::notice::Package.swift already points at $VERSION, nothing to do"
+          exit 0
+        fi
+
+        git config user.name  'github-actions[bot]'
+        git config user.email 'github-actions[bot]@users.noreply.github.com'
         git add Package.swift
         git commit -m "Update version to $VERSION"
         git push origin main
-        git tag -a $VERSION -m "Release $VERSION"
-        git push origin $VERSION
+
+        if git rev-parse "refs/tags/$VERSION" >/dev/null 2>&1; then
+          echo "::notice::tag $VERSION already exists, leaving it alone"
+        else
+          git tag -a "$VERSION" -m "Release $VERSION"
+          git push origin "$VERSION"
+        fi
