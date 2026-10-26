@@ -1,6 +1,8 @@
 name: upgrade fsplayer
 
-# 手动版本：自己下载 zip 并算校验和。自动发布链路走 upgrade-with-checksum.yml。
+# 手动补发用：给一个版本号，它自己下载 zip、算校验和、改 Package.swift、打 tag。
+# 正常发布不需要它 —— 自动链路由 debugly/fsplayer 的 fsplayer-release.yml 直接用
+# 部署密钥改 Package.swift 并推 commit（和 homebrew-aura 同一套做法）。
 on:
   workflow_dispatch:
     inputs:
@@ -28,7 +30,14 @@ jobs:
         VERSION="${{ inputs.version }}"
         url="https://github.com/debugly/fsplayer/releases/download/$VERSION/FSPlayer.zip"
 
-        curl -LO "$url"
+        # 刚发布的 release 在 CDN 上要过一会儿才一致，第一次可能 404，
+        # 所以重试几次；-f 让 404/5xx 变成失败而不是把错误页存成 zip。
+        for attempt in 1 2 3 4 5; do
+          if curl -fsSL -o FSPlayer.zip "$url"; then break; fi
+          echo "::warning::下载失败（第 ${attempt} 次），10 秒后重试"
+          sleep 10
+        done
+        [[ -s FSPlayer.zip ]] || { echo "::error::下载不到 $url"; exit 1; }
         sum=$(swift package compute-checksum FSPlayer.zip)
 
         sed -i.bak "s|^[[:space:]]*url:.*|            url: \"$url\",|g"  Package.swift
