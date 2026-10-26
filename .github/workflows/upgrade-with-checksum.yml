@@ -1,9 +1,15 @@
 name: upgrade fsplayer (with checksum)
 
-# 由 debugly/fsplayer 的 fsplayer-release.yml 在发布后自动触发，checksum 由源仓库
-# 算好后传进来 —— 不要在这里重新下载 zip 重算：刚发布的 release 在 CDN 上是最终
-# 一致的，立刻下载可能拿不到。和 upgrade.yml（手动版）的区别仅此。
+# 由 debugly/fsplayer 的 fsplayer-release.yml 在发布后触发：那边用部署密钥把
+# upgrade/<version> 这个注记 tag 推到本仓库，tag 的 message 里带 checksum=...。
+# 走 git push 而不是调 API，是为了让源仓库不需要任何 PAT。
+# checksum 由源仓库算好传进来 —— 不要在这里重新下载 zip 重算：刚发布的 release
+# 在 CDN 上要过一会儿才一致，立刻下载可能拿到旧字节。
+# 和 upgrade.yml（手动版）的区别仅此。
 on:
+  push:
+    tags:
+      - 'upgrade/*'
   workflow_dispatch:
     inputs:
       version:
@@ -22,16 +28,43 @@ jobs:
     runs-on: macos-14
 
     steps:
+    # 显式检 main：tag push 事件默认是 detached HEAD，后面要 push origin main。
     - name: Checkout
       uses: actions/checkout@v7
+      with:
+        ref: main
+
+    - name: Resolve version and checksum
+      env:
+        EVENT_NAME: ${{ github.event_name }}
+        INPUT_VERSION: ${{ inputs.version }}
+        INPUT_CHECKSUM: ${{ inputs.checksum }}
+      run: |
+        set -euo pipefail
+        if [[ "$EVENT_NAME" == "push" ]]; then
+          VERSION="${GITHUB_REF_NAME#upgrade/}"
+          # 注记 tag 的 message 里带 checksum；--depth 1 只拿到 commit，
+          # 所以把 tag 对象单独 fetch 回来（--no-tags 免得把所有 tag 拉一遍）。
+          TAG_REF="refs/tags/${GITHUB_REF_NAME}"
+          git fetch --no-tags --depth=1 origin "+${TAG_REF}:${TAG_REF}" || true
+          CHECKSUM="$(git for-each-ref --format='%(contents)' "$TAG_REF" \
+            | sed -nE 's/^checksum=([0-9a-f]{64})$/\1/p' | head -1)"
+        else
+          VERSION="$INPUT_VERSION"
+          CHECKSUM="$INPUT_CHECKSUM"
+        fi
+        [[ -n "$VERSION" && -n "$CHECKSUM" ]] || {
+          echo "::error::need both version and checksum (tag message must carry checksum=<sha256>)"
+          exit 1; }
+        echo "VERSION=$VERSION"   >> "$GITHUB_ENV"
+        echo "CHECKSUM=$CHECKSUM" >> "$GITHUB_ENV"
+        echo "version=$VERSION checksum=$CHECKSUM"
 
     - name: Update checksum
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
         set -euo pipefail
-        VERSION="${{ inputs.version }}"
-        CHECKSUM="${{ inputs.checksum }}"
         url="https://github.com/debugly/fsplayer/releases/download/$VERSION/FSPlayer.zip"
 
         # -i.bak 而非 -i ''：runner 现在是 macOS，但这样在 Linux 上也能跑。
@@ -59,3 +92,12 @@ jobs:
           git tag -a "$VERSION" -m "Release $VERSION"
           git push origin "$VERSION"
         fi
+
+    # 触发用的 tag 是临时信号，用完就删，别让仓库里堆一排 upgrade/*。
+    # 用 git push 删而不是调 API：checkout 已经配好了带写权限的凭据。
+    - name: Delete the trigger tag
+      if: github.event_name == 'push'
+      run: |
+        set -euo pipefail
+        git push origin ":refs/tags/${GITHUB_REF_NAME}" || \
+          echo "::warning::could not delete trigger tag ${GITHUB_REF_NAME}"
