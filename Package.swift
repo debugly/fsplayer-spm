@@ -22,8 +22,8 @@ let package = Package(
     targets: [
         .binaryTarget(
             name: "FSPlayer",
-            url: "https://github.com/debugly/fsplayer/releases/download/1.1.3-beta-4/FSPlayer.zip",
-            checksum: "7fcd2386ccc970f843dcbe5d3722d8b549373171a4d95ed15b7136c7698f30cf"
+            url: "https://github.com/debugly/fsplayer/releases/download/1.1.3/FSPlayer.zip",
+            checksum: "d1cb176720dbc4dc3273ecc76d8da1763c33cc25e5923462bd789cc440e3f961"
         )
     ]
 )
